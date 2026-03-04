@@ -1,6 +1,7 @@
 /**
- * Validates gateway-issued JWTs using the Internal Gateway's JWKS.
+ * Validates gateway-issued JWTs using Ops App BE's JWKS.
  * Fetches JWKS once (or with TTL cache) and verifies signature + exp.
+ * Payload includes role for mi6 authZ.
  */
 
 import { createVerify } from 'crypto';
@@ -18,6 +19,7 @@ export interface GatewayTokenPayload {
   sub: string;
   email?: string;
   name?: string;
+  role?: string;
   iat: number;
   exp: number;
   iss: string;
