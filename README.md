@@ -21,14 +21,14 @@ mi6 --(validate token, use req.user.role)--> allow/deny
 | Path | Description |
 |------|-------------|
 | **krakend/** | KrakenD config: Okta validator for `/auth/token`, Ops App BE JWKS validator for `/api/*`, propagate_claims. |
-| **internal-gateway/** | Ops App BE auth service: Okta validation, identity→role mapping, gateway JWT signing, JWKS. Supports both direct Okta token and KrakenD-propagated headers. |
+| **ops-app-be/** | Ops App BE auth service: Okta validation, identity→role mapping, gateway JWT signing, JWKS. Supports both direct Okta token and KrakenD-propagated headers. |
 | **mi6/** | mi6 middleware: validate gateway token via Ops App BE JWKS, set `req.user` (incl. `role`). |
 
 ## KrakenD
 
 - **krakend/krakend.json**: Replace `{OKTA_DOMAIN}` with your Okta domain; set `host` for `ops-app-be` and `mi6` to your service URLs. JWKS shared cache 15 min.
 
-## Ops App BE (internal-gateway)
+## Ops App BE (ops-app-be/)
 
 - `src/auth/okta-validator.ts` — Validate Okta token (introspect); used when not behind KrakenD.
 - `src/auth/role-mapper.ts` — Map identity (sub, email) to role (env: `ROLE_MAP_JSON`, `DEFAULT_ROLE`).
@@ -49,7 +49,7 @@ mi6 --(validate token, use req.user.role)--> allow/deny
 ## Using this in a real repo
 
 1. Copy **krakend/krakend.json** and substitute Okta domain and backend hosts.
-2. Run the auth logic in **internal-gateway** as your Ops App BE (same process or separate service).
+2. Run the auth logic in **ops-app-be** as your Ops App BE (same process or separate service).
 3. In mi6, use `req.user.role` for role-based checks after the gateway-token middleware.
 4. Add tests and wire secrets (e.g. Vault) as in the PR.
 
