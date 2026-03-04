@@ -1,6 +1,6 @@
 /**
- * Build and serve JWKS (JSON Web Key Set) for the gateway's public key.
- * mi6 fetches this to validate gateway-issued JWTs.
+ * Build and serve JWKS (JSON Web Key Set) for Ops App BE's public key.
+ * KrakenD and mi6 fetch this to validate Ops App BE–issued gateway JWTs.
  */
 
 import { createPublicKey } from 'crypto';
