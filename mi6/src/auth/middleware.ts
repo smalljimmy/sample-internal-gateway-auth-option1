@@ -1,5 +1,6 @@
 /**
- * mi6 auth middleware: require valid gateway token and set req.user for role checks.
+ * mi6 auth middleware: require valid gateway token and set req.user (incl. role) for authZ.
+ * Token is issued by Ops App BE; payload includes role from identity→role mapping.
  */
 
 import type { Request, Response, NextFunction } from 'express';
@@ -21,7 +22,7 @@ function getBearerToken(req: Request): string | null {
 }
 
 /**
- * Middleware factory: require valid gateway JWT; set req.user from payload.
+ * Middleware factory: require valid gateway JWT; set req.user from payload (sub, email, role, etc.).
  */
 export function createRequireGatewayTokenMiddleware(config: GatewayValidatorConfig) {
   const validator = createGatewayTokenValidator(config);
