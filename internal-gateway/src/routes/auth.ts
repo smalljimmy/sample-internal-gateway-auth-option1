@@ -1,5 +1,6 @@
 /**
- * Auth routes: exchange Okta token for gateway token, serve JWKS.
+ * Auth routes: exchange Okta token (or KrakenD-propagated identity) for gateway token, serve JWKS.
+ * When behind KrakenD, POST /auth/token receives X-User-Id, X-User-Email, X-User-Name from gateway.
  */
 
 import { Router } from 'express';
