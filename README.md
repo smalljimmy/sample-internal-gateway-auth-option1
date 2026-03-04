@@ -1,44 +1,59 @@
 # sample-internal-gateway-auth-option1
 
-Sample PR: Option 1 — Auth layer in Internal Gateway (Okta + JWT + JWKS) and mi6 gateway-token validation.
+Sample for the Internal Gateway auth flow: **KrakenD** validates Okta and proxies to **Ops App BE**, which issues a short-lived gateway JWT (with identity→role mapping) and exposes JWKS; **mi6** validates the gateway token and uses `req.user.role` for authZ.
 
-This folder contains a **sample PR** for the Option 1 auth flow (Internal Gateway validates Okta and issues its own JWT; mi6 validates that JWT via the gateway's JWKS).
+## Flow
+
+```
+[Login / token reissue]
+FE --(Okta token)--> KrakenD
+KrakenD --(validate Okta JWT, propagate claims)--> Ops App BE POST /auth/token
+Ops App BE --(map identity→role, issue gateway JWT)--> FE
+
+[API calls]
+FE --(Gateway token)--> KrakenD
+KrakenD --(validate gateway JWT with Ops App BE JWKS)--> mi6
+mi6 --(validate token, use req.user.role)--> allow/deny
+```
 
 ## Contents
 
 | Path | Description |
 |------|-------------|
-| **PULL_REQUEST.md** | PR description: summary, problem, solution, file list, testing, follow-ups. |
-| **internal-gateway/** | Sample Internal Gateway auth: Okta validation, gateway JWT signing, JWKS endpoint. |
-| **mi6/** | Sample mi6 middleware: validate gateway token using gateway JWKS (with cache). |
+| **krakend/** | KrakenD config: Okta validator for `/auth/token`, Ops App BE JWKS validator for `/api/*`, propagate_claims. |
+| **internal-gateway/** | Ops App BE auth service: Okta validation, identity→role mapping, gateway JWT signing, JWKS. Supports both direct Okta token and KrakenD-propagated headers. |
+| **mi6/** | mi6 middleware: validate gateway token via Ops App BE JWKS, set `req.user` (incl. `role`). |
 
-## Internal Gateway (sample)
+## KrakenD
 
-- `src/auth/okta-validator.ts` — Validate Okta token (introspect).
-- `src/auth/gateway-token.ts` — Sign gateway JWT (RS256), verify with PEM.
-- `src/auth/jwks.ts` — Build JWKS from gateway key.
-- `src/auth/middleware.ts` — Login handler (Okta → gateway token), optional gateway-token check.
+- **krakend/krakend.json**: Replace `{OKTA_DOMAIN}` with your Okta domain; set `host` for `ops-app-be` and `mi6` to your service URLs. JWKS shared cache 15 min.
+
+## Ops App BE (internal-gateway)
+
+- `src/auth/okta-validator.ts` — Validate Okta token (introspect); used when not behind KrakenD.
+- `src/auth/role-mapper.ts` — Map identity (sub, email) to role (env: `ROLE_MAP_JSON`, `DEFAULT_ROLE`).
+- `src/auth/gateway-token.ts` — Sign gateway JWT (RS256) with `role` in payload.
+- `src/auth/jwks.ts` — Ops App BE JWKS for KrakenD and mi6.
+- `src/auth/middleware.ts` — Login: accept Okta token or KrakenD headers (X-User-Id, X-User-Email, X-User-Name); map identity→role; issue token.
 - `src/routes/auth.ts` — `POST /auth/token`, `GET /.well-known/jwks.json`.
 
-**Config (env):** `OKTA_ISSUER`, `OKTA_CLIENT_ID`, `OKTA_CLIENT_SECRET`, `GATEWAY_JWT_PRIVATE_KEY` (PEM), `GATEWAY_JWT_KID`, `GATEWAY_JWT_ISSUER`, `GATEWAY_JWT_AUDIENCE`.
+**Config (env):** `OKTA_ISSUER`, `OKTA_CLIENT_ID`, `GATEWAY_JWT_PRIVATE_KEY`, `GATEWAY_JWT_KID`, `GATEWAY_JWT_ISSUER`, `GATEWAY_JWT_AUDIENCE`, optional `ROLE_MAP_JSON`, `DEFAULT_ROLE`.
 
-## mi6 (sample)
+## mi6
 
-- `src/auth/gateway-token-validator.ts` — Fetch gateway JWKS, cache, validate gateway JWT.
-- `src/auth/middleware.ts` — `createRequireGatewayTokenMiddleware`: require valid token, set `req.user`.
+- `src/auth/gateway-token-validator.ts` — Fetch Ops App BE JWKS, cache, validate gateway JWT (payload includes `role`).
+- `src/auth/middleware.ts` — Require valid token, set `req.user` (sub, email, role, etc.) for authZ.
 
-**Config (env):** `GATEWAY_JWKS_URL`, optional `GATEWAY_JWKS_CACHE_TTL_MS`, `GATEWAY_JWT_ISSUER`, `GATEWAY_JWT_AUDIENCE`.
+**Config (env):** `GATEWAY_JWKS_URL` (e.g. `https://ops-app-be/.well-known/jwks.json`), optional `GATEWAY_JWKS_CACHE_TTL_MS`, `GATEWAY_JWT_ISSUER`, `GATEWAY_JWT_AUDIENCE`.
 
-## Using this as a real PR
+## Using this in a real repo
 
-1. Copy **PULL_REQUEST.md** into your repo as the PR description (e.g. in the GitHub PR body).
-2. Adapt the file paths to your Internal Gateway and mi6 repos (or monorepo).
-3. Replace sample code with your stack (e.g. use `jose` or `jsonwebtoken` + `jwks-rsa` for JWT/JWKS; keep the same flow).
-4. Add tests and wire env/secrets as in the PR "Testing" and "Config" sections.
+1. Copy **krakend/krakend.json** and substitute Okta domain and backend hosts.
+2. Run the auth logic in **internal-gateway** as your Ops App BE (same process or separate service).
+3. In mi6, use `req.user.role` for role-based checks after the gateway-token middleware.
+4. Add tests and wire secrets (e.g. Vault) as in the PR.
 
-## Flow (reminder)
+## References
 
-```
-Login:  FE → (Okta token) → Gateway → validate with Okta → issue gateway JWT → FE
-APIs:   FE → (gateway token) → mi6 → validate with gateway JWKS (cached) → allow/deny
-```
+- PR [#1](https://github.com/smalljimmy/sample-internal-gateway-auth-option1/pull/1): full design (KrakenD + Ops App BE + mi6, role management).
+- Okta: token introspection / JWKS. RFC 7517 (JWKS), RFC 7519 (JWT).
