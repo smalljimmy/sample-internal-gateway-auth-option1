@@ -1,6 +1,7 @@
 /**
- * Issues gateway JWTs signed with the gateway's own key (RS256).
- * mi6 will validate these using the gateway's public key from JWKS.
+ * Issues gateway JWTs signed with Ops App BE's own key (RS256).
+ * mi6 and KrakenD validate these using Ops App BE's public key from JWKS.
+ * Payload includes role (mapped from identity) for mi6 authZ.
  */
 
 import { createSign, createVerify } from 'crypto';
@@ -17,6 +18,7 @@ export interface GatewayTokenPayload {
   sub: string;
   email?: string;
   name?: string;
+  role?: string;
   iat: number;
   exp: number;
   iss: string;
@@ -24,11 +26,11 @@ export interface GatewayTokenPayload {
 }
 
 /**
- * Sign a gateway JWT (RS256) with claims from Okta.
+ * Sign a gateway JWT (RS256) with claims from Okta and resolved role.
  */
 export function issueGatewayToken(
   oktaSub: string,
-  options: { email?: string; name?: string },
+  options: { email?: string; name?: string; role?: string },
   config: GatewayTokenConfig
 ): string {
   const now = Math.floor(Date.now() / 1000);
@@ -42,6 +44,7 @@ export function issueGatewayToken(
     sub: oktaSub,
     email: options.email,
     name: options.name,
+    role: options.role,
     iat: now,
     exp,
     iss: config.issuer,
@@ -61,7 +64,7 @@ export function issueGatewayToken(
 }
 
 /**
- * Verify a gateway JWT (e.g. for gateway-internal use). For mi6, use JWKS.
+ * Verify a gateway JWT (e.g. for Ops App BE–internal use). For mi6/KrakenD, use JWKS.
  */
 export function verifyGatewayToken(
   token: string,
