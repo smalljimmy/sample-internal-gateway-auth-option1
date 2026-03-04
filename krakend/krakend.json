@@ -1,0 +1,53 @@
+{
+  "version": 3,
+  "name": "internal-gateway",
+  "extra_config": {
+    "auth/jwk-client": {
+      "shared_cache_duration": 900
+    }
+  },
+  "endpoints": [
+    {
+      "endpoint": "/auth/token",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_url": "https://{OKTA_DOMAIN}/oauth2/v1/keys",
+          "issuer": "https://{OKTA_DOMAIN}/oauth2/default",
+          "audience": ["api://default"],
+          "cache": true,
+          "propagate_claims": [
+            ["sub", "X-User-Id"],
+            ["email", "X-User-Email"],
+            ["name", "X-User-Name"]
+          ]
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/auth/token",
+          "host": ["http://ops-app-be:3000"],
+          "encoding": "no-op"
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/{path}",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "RS256",
+          "jwk_url": "http://ops-app-be:3000/.well-known/jwks.json",
+          "issuer": "https://ops-app-be",
+          "cache": true
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/api/{path}",
+          "host": ["http://mi6:4000"]
+        }
+      ]
+    }
+  ]
+}
